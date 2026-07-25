@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Mic, MicOff, ArrowLeft, Trash2, Loader2, Maximize2, Wifi, WifiOff, Minimize2 } from 'lucide-react'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -57,6 +57,12 @@ export default function DualDisplayPage() {
 
   const error = wsError || recorderError
 
+  // connectionState 的即時值，供 handleMicClick 內的輪詢讀取（同 VoicePage 的 stale closure 修法）
+  const connectionStateRef = useRef(connectionState)
+  useEffect(() => {
+    connectionStateRef.current = connectionState
+  }, [connectionState])
+
   const handleMicClick = useCallback(async () => {
     if (state === 'recording') {
       // 停止錄音
@@ -78,11 +84,11 @@ export default function DualDisplayPage() {
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('連接超時')), 5000)
             const checkConnection = setInterval(() => {
-              if (connectionState === 'connected') {
+              if (connectionStateRef.current === 'connected') {
                 clearInterval(checkConnection)
                 clearTimeout(timeout)
                 resolve()
-              } else if (connectionState === 'error') {
+              } else if (connectionStateRef.current === 'error') {
                 clearInterval(checkConnection)
                 clearTimeout(timeout)
                 reject(new Error('連接失敗'))
@@ -122,13 +128,15 @@ export default function DualDisplayPage() {
   }[state]
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    // 100dvh：手機瀏覽器的 100vh 含網址列高度，會把底部控制列擠出畫面（要往下捲才看得到麥克風）
+    // 不支援 dvh 的舊瀏覽器會忽略 inline style，退回 h-screen
+    <div className="h-screen flex flex-col bg-black" style={{ height: '100dvh' }}>
       {/* Header - hide in fullscreen */}
       {!isFullscreen && (
-        <header className="p-3 flex items-center justify-between border-b border-gray-700 bg-gray-800">
+        <header className="shrink-0 p-3 flex items-center justify-between border-b border-neutral-800 bg-neutral-900">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+            className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>返回</span>
@@ -138,16 +146,16 @@ export default function DualDisplayPage() {
           </h1>
           <div className="flex items-center gap-2">
             <div className={`flex items-center gap-1 text-xs ${
-              isConnected ? 'text-green-500' : 'text-gray-500'
+              isConnected ? 'text-green-500' : 'text-neutral-500'
             }`}>
               {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             </div>
             <button
               onClick={toggleFullscreen}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
               title="全螢幕"
             >
-              <Maximize2 className="w-4 h-4 text-gray-400" />
+              <Maximize2 className="w-4 h-4 text-neutral-400" />
             </button>
           </div>
         </header>
@@ -161,15 +169,15 @@ export default function DualDisplayPage() {
       )}
 
       {/* Top Half - Flipped 180° for person across */}
-      <div className="flex-1 flex items-center justify-center p-6 border-b border-gray-700 overflow-auto">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-6 border-b border-neutral-800 overflow-auto">
         <div className="text-flipped w-full max-w-4xl">
           {displayText ? (
             <p className="font-content text-2xl md:text-4xl text-white leading-relaxed text-center whitespace-pre-wrap">
               {displayText}
-              {partialText && <span className="text-gray-500 animate-pulse">|</span>}
+              {partialText && <span className="text-neutral-500 animate-pulse">|</span>}
             </p>
           ) : (
-            <p className="font-content text-2xl md:text-3xl text-gray-500 text-center">
+            <p className="font-content text-2xl md:text-3xl text-neutral-500 text-center">
               {statusText}
             </p>
           )}
@@ -177,15 +185,15 @@ export default function DualDisplayPage() {
       </div>
 
       {/* Bottom Half - Normal for self */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-6 overflow-auto">
         <div className="w-full max-w-4xl">
           {displayText ? (
             <p className="font-content text-2xl md:text-4xl text-white leading-relaxed text-center whitespace-pre-wrap">
               {displayText}
-              {partialText && <span className="text-gray-500 animate-pulse">|</span>}
+              {partialText && <span className="text-neutral-500 animate-pulse">|</span>}
             </p>
           ) : (
-            <p className="font-content text-2xl md:text-3xl text-gray-500 text-center">
+            <p className="font-content text-2xl md:text-3xl text-neutral-500 text-center">
               {statusText}
             </p>
           )}
@@ -193,19 +201,19 @@ export default function DualDisplayPage() {
       </div>
 
       {/* Control Bar */}
-      <div className="p-4 flex items-center justify-center gap-4 bg-gray-800 border-t border-gray-700">
+      <div className="shrink-0 p-4 flex items-center justify-center gap-4 bg-neutral-900 border-t border-neutral-800">
         {/* Clear Button */}
         <button
           onClick={handleClear}
-          className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+          className="p-3 bg-neutral-800 hover:bg-neutral-700 rounded-full transition-colors"
           title="清除"
         >
-          <Trash2 className="w-5 h-5 text-gray-300" />
+          <Trash2 className="w-5 h-5 text-neutral-300" />
         </button>
 
         {/* Volume Indicator */}
         {state === 'recording' && (
-          <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-16 h-1 bg-neutral-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-green-500 transition-all duration-75"
               style={{ width: `${volumeLevel * 100}%` }}
@@ -220,10 +228,10 @@ export default function DualDisplayPage() {
           className={`
             w-16 h-16 rounded-full flex items-center justify-center transition-all
             ${state === 'idle'
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              ? 'bg-white hover:bg-neutral-200 text-black'
               : state === 'recording'
               ? 'bg-red-500 text-white recording-pulse recording-glow'
-              : 'bg-gray-600 text-white cursor-not-allowed'
+              : 'bg-neutral-600 text-white cursor-not-allowed'
             }
           `}
         >
@@ -239,13 +247,13 @@ export default function DualDisplayPage() {
         {/* Fullscreen Toggle (always visible) */}
         <button
           onClick={toggleFullscreen}
-          className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+          className="p-3 bg-neutral-800 hover:bg-neutral-700 rounded-full transition-colors"
           title={isFullscreen ? '退出全螢幕' : '全螢幕'}
         >
           {isFullscreen ? (
-            <Minimize2 className="w-5 h-5 text-gray-300" />
+            <Minimize2 className="w-5 h-5 text-neutral-300" />
           ) : (
-            <Maximize2 className="w-5 h-5 text-gray-300" />
+            <Maximize2 className="w-5 h-5 text-neutral-300" />
           )}
         </button>
       </div>
