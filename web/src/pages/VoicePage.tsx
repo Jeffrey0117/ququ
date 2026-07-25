@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Mic, MicOff, ArrowLeft, Copy, Trash2, Loader2, Wifi, WifiOff } from 'lucide-react'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -47,6 +47,13 @@ export default function VoicePage() {
 
   const error = wsError || recorderError
 
+  // connectionState 的即時值，供 handleMicClick 內的輪詢讀取
+  // （setInterval 建立當下閉包住的 connectionState 永遠是舊值，不會反映 WebSocket 實際連上的狀態）
+  const connectionStateRef = useRef(connectionState)
+  useEffect(() => {
+    connectionStateRef.current = connectionState
+  }, [connectionState])
+
   const handleMicClick = useCallback(async () => {
     if (state === 'recording') {
       // 停止錄音
@@ -70,11 +77,11 @@ export default function VoicePage() {
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('連接超時')), 5000)
             const checkConnection = setInterval(() => {
-              if (connectionState === 'connected') {
+              if (connectionStateRef.current === 'connected') {
                 clearInterval(checkConnection)
                 clearTimeout(timeout)
                 resolve()
-              } else if (connectionState === 'error') {
+              } else if (connectionStateRef.current === 'error') {
                 clearInterval(checkConnection)
                 clearTimeout(timeout)
                 reject(new Error('連接失敗'))
