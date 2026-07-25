@@ -153,9 +153,18 @@ export function useWebSocket(): UseWebSocketReturn {
   const sendAudio = useCallback((audioData: ArrayBuffer) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       // 將 ArrayBuffer 轉換為 Base64
-      const base64 = btoa(
-        String.fromCharCode(...new Uint8Array(audioData))
-      )
+      // 注意：不能用 String.fromCharCode(...bytes) 展開整個陣列——
+      // 音訊 chunk 幾千個 byte 就可能在部分瀏覽器（尤其 Safari）
+      // 觸發 "Maximum call stack size exceeded"，且這個例外發生在
+      // AudioContext 的 onaudioprocess callback 裡，畫面上完全看不出來，
+      // 只是每一塊音訊都靜靜送不出去。改用分批 join 避免展開整個陣列。
+      const bytes = new Uint8Array(audioData)
+      const CHUNK_SIZE = 1024
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE))
+      }
+      const base64 = btoa(binary)
 
       wsRef.current.send(JSON.stringify({
         type: 'audio',
