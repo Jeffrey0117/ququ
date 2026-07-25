@@ -16,7 +16,6 @@ export default function VoicePage() {
     finalText,
     error: wsError,
     connect,
-    disconnect,
     startRecording: wsStartRecording,
     stopRecording: wsStopRecording,
     sendAudio,
