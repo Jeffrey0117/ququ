@@ -121,7 +121,7 @@ app.add_middleware(
 
 # ==================== HTTP Endpoints ====================
 
-@app.get("/")
+@app.get("/api")
 async def root():
     """API 根路徑"""
     return {
@@ -496,6 +496,22 @@ async def websocket_stream(websocket: WebSocket):
                 sherpa.stream_end(session_id)
             except:
                 pass
+
+
+# ==================== 前端靜態檔案（SPA） ====================
+# 掛在所有 API/WebSocket 路由之後，避免蓋掉 /health、/transcribe 等既有路徑
+
+_web_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")
+
+if os.path.isdir(_web_dist):
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        candidate = os.path.join(_web_dist, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_web_dist, "index.html"))
 
 
 # ==================== Main ====================

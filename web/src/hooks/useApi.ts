@@ -2,9 +2,16 @@
  * API 連接配置與工具函數
  */
 
-// API 基礎 URL（開發時指向本地，生產時可配置）
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765'
-export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8765'
+// API 基礎 URL
+// 開發模式指向本地 8765；生產模式預設同源（前後端同一個 process/port），
+// 不寫死正式網域，換網域或本機測試 build 都不用改程式碼。
+const isProd = import.meta.env.PROD
+const sameOriginWs = typeof window !== 'undefined'
+  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+  : ''
+
+export const API_BASE_URL = import.meta.env.VITE_API_URL || (isProd ? '' : 'http://localhost:8765')
+export const WS_BASE_URL = import.meta.env.VITE_WS_URL || (isProd ? sameOriginWs : 'ws://localhost:8765')
 
 /**
  * 檢查 API 健康狀態
