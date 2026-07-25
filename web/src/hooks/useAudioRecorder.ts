@@ -53,10 +53,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
     try {
       // 請求麥克風權限
+      // 注意：不要把 channelCount/sampleRate 塞進 constraints——
+      // 部分 Android 裝置不支援 16kHz 擷取，會直接丟 OverconstrainedError
+      // （畫面上變成「無法存取麥克風」）。取樣率交給 AudioContext 處理。
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          channelCount: 1,
-          sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -65,8 +66,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
       mediaStreamRef.current = stream
 
-      // 創建 AudioContext
-      const audioContext = new AudioContext({ sampleRate: 16000 })
+      // 創建 AudioContext：優先要求 16kHz（後端模型的取樣率），
+      // 不支援的裝置（常見於 Android）退回裝置原生取樣率，再於 JS 降採樣
+      let audioContext: AudioContext
+      try {
+        audioContext = new AudioContext({ sampleRate: 16000 })
+      } catch {
+        audioContext = new AudioContext()
+      }
       audioContextRef.current = audioContext
 
       // 創建音源節點
@@ -84,10 +91,27 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       const processor = audioContext.createScriptProcessor(bufferSize, 1, 1)
       processorRef.current = processor
 
+      // AudioContext 沒跑在 16kHz 時（Android fallback），以線性內插降採樣
+      const contextRate = audioContext.sampleRate
+      const downsampleTo16k = (input: Float32Array): Float32Array => {
+        if (contextRate === 16000) return input
+        const ratio = contextRate / 16000
+        const outLen = Math.floor(input.length / ratio)
+        const out = new Float32Array(outLen)
+        for (let i = 0; i < outLen; i++) {
+          const pos = i * ratio
+          const i0 = Math.floor(pos)
+          const i1 = Math.min(i0 + 1, input.length - 1)
+          const frac = pos - i0
+          out[i] = input[i0] * (1 - frac) + input[i1] * frac
+        }
+        return out
+      }
+
       processor.onaudioprocess = (event) => {
         if (isPaused) return
 
-        const inputData = event.inputBuffer.getChannelData(0)
+        const inputData = downsampleTo16k(event.inputBuffer.getChannelData(0))
 
         // 將 Float32Array 轉換為 Int16Array (16-bit PCM)
         const pcmData = new Int16Array(inputData.length)
@@ -116,11 +140,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       console.error('Failed to start recording:', err)
       if (err instanceof DOMException) {
         if (err.name === 'NotAllowedError') {
-          setError('麥克風權限被拒絕')
+          setError('麥克風權限被拒絕，請到瀏覽器網站設定允許麥克風')
         } else if (err.name === 'NotFoundError') {
           setError('找不到麥克風設備')
         } else {
-          setError(`無法存取麥克風: ${err.message}`)
+          setError(`無法存取麥克風 (${err.name}): ${err.message}`)
         }
       } else {
         setError('錄音啟動失敗')
