@@ -157,3 +157,6 @@ poc-sherpa/sherpa-onnx-paraformer-zh-2023-09-14.tar.bz2
 poc-sherpa/sherpa-onnx-paraformer-zh-2023-09-14/model.int8.onnx
 poc-sherpa/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/
 poc-sherpa/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2
+
+# Runtime-generated hotwords state (written by sherpa_server.py)
+hotwords.txt.active
